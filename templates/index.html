@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HW1-1: Grid Map</title>
+    <style>
+        body {
+            font-family: "Times New Roman", Times, serif;
+            margin: 20px;
+            font-size: 16px;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .controls label {
+            font-size: 1.1em;
+        }
+
+        .controls input {
+            width: 50px;
+            padding: 3px;
+            font-size: 1em;
+        }
+
+        .controls button {
+            padding: 4px 10px;
+            font-size: 1em;
+            cursor: pointer;
+        }
+
+        h2 {
+            margin: 10px 0;
+            font-size: 1.3em;
+        }
+
+        .instruction {
+            margin-left: 20px;
+            font-size: 1.1em;
+            margin-bottom: 15px;
+        }
+
+        .grid-container {
+            margin-left: 20px;
+            display: inline-grid;
+            border-top: 1px solid black;
+            border-left: 1px solid black;
+        }
+
+        .cell {
+            width: 45px;
+            height: 45px;
+            border-right: 1px solid black;
+            border-bottom: 1px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            user-select: none;
+            font-size: 1.1em;
+        }
+
+        /* Color states */
+        .cell.start {
+            background-color: green;
+        }
+
+        .cell.end {
+            background-color: red;
+        }
+
+        .cell.obstacle {
+            background-color: grey;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Grid Map Development</h1>
+    <p style="font-size: 1.1em;">You can specify the input dimensions</p>
+    <form method="POST" action="/" class="controls">
+        <label for="grid-size">Enter a number between 5 and 9:</label>
+        <input type="number" name="grid_size" id="grid-size" min="5" max="9" value="{{ grid_size or '' }}" required>
+        <button type="submit" id="generate-btn">Generate Square</button>
+    </form>
+
+    {% if grid_size %}
+    <div id="workspace">
+        <h2 id="grid-title">{{ grid_size }} x {{ grid_size }} Square:</h2>
+        <div class="instruction">
+            1. Click on a cell to set up the start grid as green or the end grid as red (and obstacles as grey).
+        </div>
+        <div id="grid" class="grid-container" style="grid-template-columns: repeat({{ grid_size }}, 45px);">
+            {% for i in range(1, grid_size * grid_size + 1) %}
+            <div class="cell" onclick="handleCellClick(this)">{{ i }}</div>
+            {% endfor %}
+        </div>
+        <div class="instruction" style="margin-top: 20px;">
+            2. After setup, click: <button id="eval-btn" onclick="runEvaluation()">Run Policy Evaluation</button>
+        </div>
+
+        <div id="results" style="display: none; flex-wrap: wrap; gap: 40px; margin-top: 40px; padding-bottom: 50px;">
+            <div>
+                <h3>Value Matrix</h3>
+                <div id="value-grid" class="grid-container"></div>
+            </div>
+            <div>
+                <h3>Policy Matrix</h3>
+                <div id="policy-grid" class="grid-container"></div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        // Global state for cell interaction
+        let currentSize = {{ grid_size or 0 }};
+        let maxObstacles = currentSize > 0 ? currentSize - 2 : 0;
+        let startCell = null;
+        let endCell = null;
+        let obstacles = [];
+
+        function handleCellClick(cell) {
+            // Remove state if it already has one
+            if (cell === startCell) {
+                cell.classList.remove('start');
+                startCell = null;
+                return;
+            }
+            if (cell === endCell) {
+                cell.classList.remove('end');
+                endCell = null;
+                return;
+            }
+            if (obstacles.includes(cell)) {
+                cell.classList.remove('obstacle');
+                obstacles = obstacles.filter(c => c !== cell);
+                return;
+            }
+
+            // Assign new state depending on what's missing
+            if (!startCell) {
+                cell.classList.add('start');
+                startCell = cell;
+            } else if (!endCell) {
+                cell.classList.add('end');
+                endCell = cell;
+            } else if (obstacles.length < maxObstacles) {
+                cell.classList.add('obstacle');
+                obstacles.push(cell);
+            } else {
+                alert(`You can only set up to ${maxObstacles} obstacles for a ${currentSize} x ${currentSize} grid.`);
+            }
+        }
+
+        function getCellPos(cell) {
+            const index = parseInt(cell.textContent) - 1;
+            const r = Math.floor(index / currentSize);
+            const c = index % currentSize;
+            return [r, c];
+        }
+
+        async function runEvaluation() {
+            if (!startCell || !endCell) {
+                alert("Please set both a start (green) and an end (red) cell.");
+                return;
+            }
+
+            const evalBtn = document.getElementById('eval-btn');
+            evalBtn.disabled = true;
+            evalBtn.textContent = 'Evaluating...';
+
+            const startPos = getCellPos(startCell);
+            const endPos = getCellPos(endCell);
+            const obsPos = obstacles.map(getCellPos);
+
+            try {
+                const response = await fetch('/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        size: currentSize,
+                        start: startPos,
+                        end: endPos,
+                        obstacles: obsPos
+                    })
+                });
+
+                const data = await response.json();
+                displayResults(data.policy, data.values, startPos, endPos, obsPos);
+            } catch (err) {
+                console.error(err);
+                alert("Evaluation failed.");
+            } finally {
+                evalBtn.disabled = false;
+                evalBtn.textContent = 'Run Policy Evaluation';
+            }
+        }
+
+        function displayResults(policy, values, startPos, endPos, obsPos) {
+            document.getElementById('results').style.display = 'flex';
+
+            const vGrid = document.getElementById('value-grid');
+            const pGrid = document.getElementById('policy-grid');
+
+            vGrid.style.gridTemplateColumns = `repeat(${currentSize}, 55px)`;
+            pGrid.style.gridTemplateColumns = `repeat(${currentSize}, 55px)`;
+
+            vGrid.innerHTML = '';
+            pGrid.innerHTML = '';
+
+            const arrows = { 'U': '↑', 'D': '↓', 'L': '←', 'R': '→' };
+            const isPosInArray = (pos, arr) => arr.some(p => p[0] === pos[0] && p[1] === pos[1]);
+            const isPosEqual = (p1, p2) => p1[0] === p2[0] && p1[1] === p2[1];
+
+            for (let r = 0; r < currentSize; r++) {
+                for (let c = 0; c < currentSize; c++) {
+                    const key = `${r},${c}`;
+                    const pos = [r, c];
+
+                    const vc = document.createElement('div');
+                    vc.className = 'cell';
+                    vc.style.fontSize = '0.9em';
+                    // give cell more width in result matrix to fit float numbers
+                    vc.style.width = '55px';
+                    vc.style.height = '55px';
+
+                    const pc = document.createElement('div');
+                    pc.className = 'cell';
+                    pc.style.fontSize = '1.3em';
+                    pc.style.width = '55px';
+                    pc.style.height = '55px';
+
+                    if (isPosEqual(pos, startPos)) {
+                        vc.classList.add('start');
+                        pc.classList.add('start');
+                        vc.textContent = values[key];
+                        pc.textContent = arrows[policy[key]] || '';
+                    } else if (isPosEqual(pos, endPos)) {
+                        vc.classList.add('end');
+                        pc.classList.add('end');
+                        vc.textContent = '0'; // Terminal state
+                        pc.textContent = 'G'; // Goal
+                    } else if (isPosInArray(pos, obsPos)) {
+                        vc.classList.add('obstacle');
+                        pc.classList.add('obstacle');
+                        vc.textContent = '';
+                        pc.textContent = '';
+                    } else {
+                        vc.textContent = values[key];
+                        pc.textContent = arrows[policy[key]];
+                    }
+
+                    vGrid.appendChild(vc);
+                    pGrid.appendChild(pc);
+                }
+            }
+        }
+    </script>
+
+</body>
+
+</html>
