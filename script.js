@@ -107,8 +107,111 @@ function runRL(algo) {
             displayResults(data.policy, data.values, startPos, endPos, obsPos, path);
         })
         .catch(error => {
-            console.error('Error computing policy:', error);
-            alert('Server communication failed! Make sure your Flask backend server is running (http://127.0.0.1:5000) for AJAX async data exchange.');
+            console.warn('Backend server not communicating. Falling back to Pure JavaScript RL execution for Github Pages Live Demo.', error);
+
+            // --- Pure JS Fallback Logic for GitHub Pages ---
+            const actionsMap = ['U', 'D', 'L', 'R'];
+            const getNextState = (r, c, a, sz, obstacles) => {
+                let nr = r, nc = c;
+                if (a === 'U') nr -= 1; else if (a === 'D') nr += 1;
+                else if (a === 'L') nc -= 1; else if (a === 'R') nc += 1;
+                if (nr < 0 || nr >= sz || nc < 0 || nc >= sz || obstacles.some(o => o[0] === nr && o[1] === nc)) {
+                    nr = r; nc = c;
+                }
+                return [nr, nc];
+            };
+
+            const policy = {};
+            const V = {};
+            const theta = 1e-4;
+            const size = currentSize;
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    V[`${r},${c}`] = 0.0;
+                    if (endPos[0] === r && endPos[1] === c || obsPos.some(o => o[0] === r && o[1] === c)) continue;
+                    policy[`${r},${c}`] = actionsMap[Math.floor(Math.random() * 4)];
+                }
+            }
+
+            let path = [];
+            if (algo === 'PE') {
+                for (let iter = 0; iter < 1000; iter++) {
+                    let delta = 0.0;
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            if (endPos[0] === r && endPos[1] === c || obsPos.some(o => o[0] === r && o[1] === c)) continue;
+                            const key = `${r},${c}`;
+                            let v = V[key];
+                            let new_v = 0.0;
+                            for (let a of actionsMap) {
+                                let [nr, nc] = getNextState(r, c, a, size, obsPos);
+                                let req = (nr === endPos[0] && nc === endPos[1]) ? 10.0 : stepReward;
+                                new_v += 0.25 * (req + gamma * V[`${nr},${nc}`]);
+                            }
+                            V[key] = new_v;
+                            delta = Math.max(delta, Math.abs(v - new_v));
+                        }
+                    }
+                    if (delta < theta) break;
+                }
+            } else {
+                // Value Iteration
+                for (let iter = 0; iter < 1000; iter++) {
+                    let delta = 0.0;
+                    for (let r = 0; r < size; r++) {
+                        for (let c = 0; c < size; c++) {
+                            if (endPos[0] === r && endPos[1] === c || obsPos.some(o => o[0] === r && o[1] === c)) continue;
+                            const key = `${r},${c}`;
+                            let v = V[key];
+                            let max_v = -Infinity;
+                            for (let a of actionsMap) {
+                                let [nr, nc] = getNextState(r, c, a, size, obsPos);
+                                let req = (nr === endPos[0] && nc === endPos[1]) ? 10.0 : stepReward;
+                                let av = req + gamma * V[`${nr},${nc}`];
+                                if (av > max_v) max_v = av;
+                            }
+                            V[key] = max_v;
+                            delta = Math.max(delta, Math.abs(v - max_v));
+                        }
+                    }
+                    if (delta < theta) break;
+                }
+                // Argmax Policy
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (endPos[0] === r && endPos[1] === c || obsPos.some(o => o[0] === r && o[1] === c)) continue;
+                        let max_v = -Infinity;
+                        let best_a = 'U';
+                        for (let a of actionsMap) {
+                            let [nr, nc] = getNextState(r, c, a, size, obsPos);
+                            let req = (nr === endPos[0] && nc === endPos[1]) ? 10.0 : stepReward;
+                            let av = req + gamma * V[`${nr},${nc}`];
+                            av = Math.round(av * 10000) / 10000;
+                            if (av > max_v) { max_v = av; best_a = a; }
+                        }
+                        policy[`${r},${c}`] = best_a;
+                    }
+                }
+                // Compute path
+                let curr = startPos;
+                let visited = new Set();
+                while (curr[0] !== endPos[0] || curr[1] !== endPos[1]) {
+                    let key = `${curr[0]},${curr[1]}`;
+                    if (visited.has(key)) break;
+                    visited.add(key);
+                    path.push(curr);
+                    let a = policy[key];
+                    if (!a) break;
+                    curr = getNextState(curr[0], curr[1], a, size, obsPos);
+                }
+            }
+
+            const formatted_V = {};
+            for (const [k, v] of Object.entries(V)) {
+                formatted_V[k] = parseFloat(v).toFixed(2);
+            }
+
+            displayResults(policy, formatted_V, startPos, endPos, obsPos, path);
         })
         .finally(() => {
             evalBtnPE.disabled = false;
