@@ -10,12 +10,6 @@ This project is an implementation of a Grid Map reinforcement learning environme
   * **Policy Matrix**: A display of the random deterministic directional arrows.
 
 ## Setup and Execution
-1. Ensure you have Python installed, then install the required dependencies:
-   ```bash
-   pip install flask
-   ```
-2. Run the application:
-   ```bash
-   python app.py
-   ```
-3. Open a web browser and navigate to `http://127.0.0.1:5000`
+1. Simply download or clone the repository to your computer.
+2. Open `index.html` in your web browser (Chrome, Edge, Safari, etc.). There is no server required.
+3. If deployed on GitHub Pages, visit the URL to interact directly in the browser!

@@ -85,25 +85,21 @@
 
     <h1>Grid Map Development</h1>
     <p style="font-size: 1.1em;">You can specify the input dimensions</p>
-    <form method="POST" action="/" class="controls">
+    <div class="controls">
         <label for="grid-size">Enter a number between 5 and 9:</label>
-        <input type="number" name="grid_size" id="grid-size" min="5" max="9" value="{{ grid_size or '' }}" required>
-        <button type="submit" id="generate-btn">Generate Square</button>
-    </form>
+        <input type="number" id="grid-size" min="5" max="9" value="5">
+        <button id="generate-btn">Generate Square</button>
+    </div>
 
-    {% if grid_size %}
-    <div id="workspace">
-        <h2 id="grid-title">{{ grid_size }} x {{ grid_size }} Square:</h2>
+    <div id="workspace" style="display: none;">
+        <h2 id="grid-title"></h2>
         <div class="instruction">
             1. Click on a cell to set up the start grid as green or the end grid as red (and obstacles as grey).
         </div>
-        <div id="grid" class="grid-container" style="grid-template-columns: repeat({{ grid_size }}, 45px);">
-            {% for i in range(1, grid_size * grid_size + 1) %}
-            <div class="cell" onclick="handleCellClick(this)">{{ i }}</div>
-            {% endfor %}
-        </div>
+        <div id="grid" class="grid-container"></div>
+
         <div class="instruction" style="margin-top: 20px;">
-            2. After setup, click: <button id="eval-btn" onclick="runEvaluation()">Run Policy Evaluation</button>
+            2. After setup, click: <button id="eval-btn">Run Policy Evaluation</button>
         </div>
 
         <div id="results" style="display: none; flex-wrap: wrap; gap: 40px; margin-top: 40px; padding-bottom: 50px;">
@@ -117,18 +113,80 @@
             </div>
         </div>
     </div>
-    {% endif %}
 
     <script>
-        // Global state for cell interaction
-        let currentSize = {{ grid_size or 0 }};
-        let maxObstacles = currentSize > 0 ? currentSize - 2 : 0;
+        // --- UI State ---
+        let currentSize = 0;
+        let maxObstacles = 0;
         let startCell = null;
         let endCell = null;
         let obstacles = [];
 
+        // DOM Elements
+        const generateBtn = document.getElementById('generate-btn');
+        const sizeInput = document.getElementById('grid-size');
+        const workspace = document.getElementById('workspace');
+        const gridContainer = document.getElementById('grid');
+        const gridTitle = document.getElementById('grid-title');
+        const evalBtn = document.getElementById('eval-btn');
+        const resultsDiv = document.getElementById('results');
+
+        // --- Event Listeners ---
+        generateBtn.addEventListener('click', () => {
+            const size = parseInt(sizeInput.value);
+            if (isNaN(size) || size < 5 || size > 9) {
+                alert("Please enter a valid number between 5 and 9.");
+                return;
+            }
+
+            // Init state
+            currentSize = size;
+            maxObstacles = size - 2;
+            startCell = null;
+            endCell = null;
+            obstacles = [];
+
+            // UI Reset
+            gridTitle.textContent = `${size} x ${size} Square:`;
+            workspace.style.display = 'block';
+            resultsDiv.style.display = 'none';
+            gridContainer.innerHTML = '';
+            gridContainer.style.gridTemplateColumns = `repeat(${size}, 45px)`;
+
+            let cellNum = 1;
+            for (let i = 0; i < size * size; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = cellNum++;
+                cell.addEventListener('click', () => handleCellClick(cell));
+                gridContainer.appendChild(cell);
+            }
+        });
+
+        evalBtn.addEventListener('click', () => {
+            if (!startCell || !endCell) {
+                alert("Please set both a start (green) and an end (red) cell.");
+                return;
+            }
+
+            const startPos = getCellPos(startCell);
+            const endPos = getCellPos(endCell);
+            const obsPos = obstacles.map(getCellPos);
+
+            evalBtn.disabled = true;
+            evalBtn.textContent = 'Evaluating...';
+
+            // Give UI a moment to show "Evaluating..."
+            setTimeout(() => {
+                const results = evaluatePolicy(currentSize, startPos, endPos, obsPos);
+                displayResults(results.policy, results.values, startPos, endPos, obsPos);
+                evalBtn.disabled = false;
+                evalBtn.textContent = 'Run Policy Evaluation';
+            }, 50);
+        });
+
+        // --- Helper Functions ---
         function handleCellClick(cell) {
-            // Remove state if it already has one
             if (cell === startCell) {
                 cell.classList.remove('start');
                 startCell = null;
@@ -145,7 +203,6 @@
                 return;
             }
 
-            // Assign new state depending on what's missing
             if (!startCell) {
                 cell.classList.add('start');
                 startCell = cell;
@@ -167,46 +224,75 @@
             return [r, c];
         }
 
-        async function runEvaluation() {
-            if (!startCell || !endCell) {
-                alert("Please set both a start (green) and an end (red) cell.");
-                return;
+        // --- Reinforcement Learning Logic ---
+        function evaluatePolicy(size, start, end, obstacles) {
+            const actions = ['U', 'D', 'L', 'R'];
+            const policy = {};
+            const V = {};
+            const gamma = 0.9;
+            const theta = 1e-4;
+
+            const isObstacle = (r, c) => obstacles.some(obs => obs[0] === r && obs[1] === c);
+            const isEnd = (r, c) => end[0] === r && end[1] === c;
+
+            // 1. Generate random deterministic policy & init V
+            for (let r = 0; r < size; r++) {
+                for (let c = 0; c < size; c++) {
+                    const key = `${r},${c}`;
+                    V[key] = 0.0;
+                    if (isEnd(r, c) || isObstacle(r, c)) continue;
+                    policy[key] = actions[Math.floor(Math.random() * actions.length)];
+                }
             }
 
-            const evalBtn = document.getElementById('eval-btn');
-            evalBtn.disabled = true;
-            evalBtn.textContent = 'Evaluating...';
+            // 2. Policy Evaluation (Evaluating a uniform random policy)
+            let max_iters = 1000;
+            for (let iter = 0; iter < max_iters; iter++) {
+                let delta = 0.0;
+                for (let r = 0; r < size; r++) {
+                    for (let c = 0; c < size; c++) {
+                        if (isEnd(r, c) || isObstacle(r, c)) continue;
 
-            const startPos = getCellPos(startCell);
-            const endPos = getCellPos(endCell);
-            const obsPos = obstacles.map(getCellPos);
+                        const state_key = `${r},${c}`;
+                        let v = V[state_key];
 
-            try {
-                const response = await fetch('/evaluate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        size: currentSize,
-                        start: startPos,
-                        end: endPos,
-                        obstacles: obsPos
-                    })
-                });
+                        let new_v = 0.0;
+                        for (let a of actions) {
+                            let nr = r, nc = c;
+                            if (a === 'U') nr -= 1;
+                            else if (a === 'D') nr += 1;
+                            else if (a === 'L') nc -= 1;
+                            else if (a === 'R') nc += 1;
 
-                const data = await response.json();
-                displayResults(data.policy, data.values, startPos, endPos, obsPos);
-            } catch (err) {
-                console.error(err);
-                alert("Evaluation failed.");
-            } finally {
-                evalBtn.disabled = false;
-                evalBtn.textContent = 'Run Policy Evaluation';
+                            if (nr < 0 || nr >= size || nc < 0 || nc >= size || isObstacle(nr, nc)) {
+                                nr = r;
+                                nc = c;
+                            }
+
+                            let next_state_key = `${nr},${nc}`;
+                            let reward = isEnd(nr, nc) ? 10.0 : -1.0;
+                            // Uniform probability
+                            new_v += 0.25 * (reward + gamma * V[next_state_key]);
+                        }
+
+                        V[state_key] = new_v;
+                        delta = Math.max(delta, Math.abs(v - new_v));
+                    }
+                }
+                if (delta < theta) break;
             }
+
+            const formatted_V = {};
+            for (const [k, v] of Object.entries(V)) {
+                formatted_V[k] = parseFloat(v).toFixed(2);
+            }
+
+            return { policy: policy, values: formatted_V };
         }
 
+        // --- Render Results ---
         function displayResults(policy, values, startPos, endPos, obsPos) {
-            document.getElementById('results').style.display = 'flex';
-
+            resultsDiv.style.display = 'flex';
             const vGrid = document.getElementById('value-grid');
             const pGrid = document.getElementById('policy-grid');
 
@@ -228,7 +314,6 @@
                     const vc = document.createElement('div');
                     vc.className = 'cell';
                     vc.style.fontSize = '0.9em';
-                    // give cell more width in result matrix to fit float numbers
                     vc.style.width = '55px';
                     vc.style.height = '55px';
 
@@ -264,7 +349,6 @@
             }
         }
     </script>
-
 </body>
 
 </html>
