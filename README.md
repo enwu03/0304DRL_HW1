@@ -1,5 +1,7 @@
 # 0304DRL_HW1 - Grid Map Development & Policy Evaluation
 
+**[Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
+
 This project is an implementation of a Grid Map reinforcement learning environment using Python (Flask) and HTML/JS. 
 
 ## Features
