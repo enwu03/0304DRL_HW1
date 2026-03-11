@@ -1,5 +1,7 @@
 # 0304DRL_HW1 - Grid Map Development & Policy Evaluation
 
+**[Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
+
 ![Grid Map Demo](demo.webp)
 
 This project is an implementation of a Grid Map reinforcement learning environment. It consists of a frontend (HTML/CSS/JS) to handle dynamic UI rendering, and a Python Flask backend to execute synchronous/asynchronous logic for Value Iteration and Policy Evaluation over AJAX.
