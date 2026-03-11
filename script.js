@@ -75,23 +75,47 @@ function runRL(algo) {
 
     evalBtnPE.disabled = true;
     evalBtnVI.disabled = true;
+    const oldPEText = evalBtnPE.textContent;
+    const oldVIText = evalBtnVI.textContent;
+    evalBtnPE.textContent = 'Evaluating...';
+    evalBtnVI.textContent = 'Evaluating...';
 
-    // Give UI a moment to show "Evaluating..."
-    setTimeout(() => {
-        let results;
-        let path = [];
-
-        if (algo === 'PE') {
-            results = evaluatePolicyPE(currentSize, startPos, endPos, obsPos, gamma, stepReward);
-        } else {
-            results = runValueIteration(currentSize, startPos, endPos, obsPos, gamma, stepReward);
-            path = computeOptimalPath(results.policy, startPos, endPos, obsPos, currentSize);
-        }
-
-        displayResults(results.policy, results.values, startPos, endPos, obsPos, path);
-        evalBtnPE.disabled = false;
-        evalBtnVI.disabled = false;
-    }, 50);
+    // AJAX communication with Python Server (app.py)
+    fetch('/evaluate', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            size: currentSize,
+            start: startPos,
+            end: endPos,
+            obstacles: obsPos,
+            gamma: gamma,
+            stepReward: stepReward,
+            algo: algo
+        })
+    })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            const path = data.path || [];
+            displayResults(data.policy, data.values, startPos, endPos, obsPos, path);
+        })
+        .catch(error => {
+            console.error('Error computing policy:', error);
+            alert('Server communication failed! Make sure your Flask backend server is running (http://127.0.0.1:5000) for AJAX async data exchange.');
+        })
+        .finally(() => {
+            evalBtnPE.disabled = false;
+            evalBtnVI.disabled = false;
+            evalBtnPE.textContent = oldPEText;
+            evalBtnVI.textContent = oldVIText;
+        });
 }
 
 // --- Helper Functions ---
@@ -131,178 +155,6 @@ function getCellPos(cell) {
     const r = Math.floor(index / currentSize);
     const c = index % currentSize;
     return [r, c];
-}
-
-// --- Reinforcement Learning Logic ---
-
-// Action mapping helper
-const actionsMap = ['U', 'D', 'L', 'R'];
-function getNextState(r, c, a, size, isObstacle) {
-    let nr = r, nc = c;
-    if (a === 'U') nr -= 1;
-    else if (a === 'D') nr += 1;
-    else if (a === 'L') nc -= 1;
-    else if (a === 'R') nc += 1;
-
-    if (nr < 0 || nr >= size || nc < 0 || nc >= size || isObstacle(nr, nc)) {
-        nr = r;
-        nc = c;
-    }
-    return [nr, nc];
-}
-
-// HW1-2: Policy Evaluation (Average sum across random 0.25 probability)
-function evaluatePolicyPE(size, start, end, obstacles, gamma, stepReward) {
-    const policy = {};
-    const V = {};
-    const theta = 1e-4;
-
-    const isObstacle = (r, c) => obstacles.some(obs => obs[0] === r && obs[1] === c);
-    const isEnd = (r, c) => end[0] === r && end[1] === c;
-
-    // 1. Init Random Policy & V
-    for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-            const key = `${r},${c}`;
-            V[key] = 0.0;
-            if (isEnd(r, c) || isObstacle(r, c)) continue;
-            policy[key] = actionsMap[Math.floor(Math.random() * actionsMap.length)];
-        }
-    }
-
-    // 2. Policy Evaluation
-    let max_iters = 1000;
-    for (let iter = 0; iter < max_iters; iter++) {
-        let delta = 0.0;
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-                if (isEnd(r, c) || isObstacle(r, c)) continue;
-
-                const state_key = `${r},${c}`;
-                let v = V[state_key];
-
-                let new_v = 0.0;
-                for (let a of actionsMap) {
-                    let [nr, nc] = getNextState(r, c, a, size, isObstacle);
-                    let reward = isEnd(nr, nc) ? 10.0 : stepReward;
-                    let next_state_key = `${nr},${nc}`;
-                    // Uniform Probability PE
-                    new_v += 0.25 * (reward + gamma * V[next_state_key]);
-                }
-
-                V[state_key] = new_v;
-                delta = Math.max(delta, Math.abs(v - new_v));
-            }
-        }
-        if (delta < theta) break;
-    }
-
-    const formatted_V = {};
-    for (const [k, v] of Object.entries(V)) {
-        formatted_V[k] = parseFloat(v).toFixed(2);
-    }
-    return { policy, values: formatted_V };
-}
-
-// HW1-3: Value Iteration & Argmax Policy Extraction (MAX operator)
-function runValueIteration(size, start, end, obstacles, gamma, stepReward) {
-    const policy = {};
-    const V = {};
-    const theta = 1e-4;
-
-    const isObstacle = (r, c) => obstacles.some(obs => obs[0] === r && obs[1] === c);
-    const isEnd = (r, c) => end[0] === r && end[1] === c;
-
-    // Init V
-    for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-            V[`${r},${c}`] = 0.0;
-        }
-    }
-
-    // 1. Value Iteration (Max Operator)
-    let max_iters = 1000;
-    for (let iter = 0; iter < max_iters; iter++) {
-        let delta = 0.0;
-        for (let r = 0; r < size; r++) {
-            for (let c = 0; c < size; c++) {
-                if (isEnd(r, c) || isObstacle(r, c)) continue;
-
-                const state_key = `${r},${c}`;
-                let v = V[state_key];
-
-                let max_v = -Infinity;
-                for (let a of actionsMap) {
-                    let [nr, nc] = getNextState(r, c, a, size, isObstacle);
-                    let reward = isEnd(nr, nc) ? 10.0 : stepReward;
-                    let next_state_key = `${nr},${nc}`;
-
-                    let action_value = reward + gamma * V[next_state_key];
-                    if (action_value > max_v) max_v = action_value;
-                }
-
-                V[state_key] = max_v;
-                delta = Math.max(delta, Math.abs(v - max_v));
-            }
-        }
-        if (delta < theta) break;
-    }
-
-    // 2. Policy Extraction (Argmax)
-    for (let r = 0; r < size; r++) {
-        for (let c = 0; c < size; c++) {
-            if (isEnd(r, c) || isObstacle(r, c)) continue;
-            const state_key = `${r},${c}`;
-
-            let max_v = -Infinity;
-            let best_a = 'U';
-
-            for (let a of actionsMap) {
-                let [nr, nc] = getNextState(r, c, a, size, isObstacle);
-                let reward = isEnd(nr, nc) ? 10.0 : stepReward;
-                let next_state_key = `${nr},${nc}`;
-
-                let action_value = reward + gamma * V[next_state_key];
-                // Rounding to prevent floating point instability causing inconsistent argmax paths
-                action_value = Math.round(action_value * 10000) / 10000;
-
-                if (action_value > max_v) {
-                    max_v = action_value;
-                    best_a = a;
-                }
-            }
-            policy[state_key] = best_a;
-        }
-    }
-
-    const formatted_V = {};
-    for (const [k, v] of Object.entries(V)) {
-        formatted_V[k] = parseFloat(v).toFixed(2);
-    }
-    return { policy, values: formatted_V };
-}
-
-function computeOptimalPath(policy, start, end, obstacles, size) {
-    let path = [];
-    let curr = start;
-    let visited = new Set();
-    const isObstacle = (r, c) => obstacles.some(obs => obs[0] === r && obs[1] === c);
-
-    // limit iterations to avoid infinite loops if it gets stuck
-    while (curr[0] !== end[0] || curr[1] !== end[1]) {
-        let key = `${curr[0]},${curr[1]}`;
-        if (visited.has(key)) break; // loop detected
-        visited.add(key);
-        path.push(curr);
-
-        let a = policy[key];
-        if (!a) break;
-
-        let next = getNextState(curr[0], curr[1], a, size, isObstacle);
-        curr = next;
-    }
-    // Note: this array does NOT include the 'end' point intentionally, we only highlight the travel path
-    return path;
 }
 
 // --- Render Results ---
