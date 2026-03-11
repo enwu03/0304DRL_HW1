@@ -27,4 +27,4 @@ You can directly interact with the application through GitHub Pages without down
    git clone https://github.com/enwu03/0304DRL_HW1.git
    ```
 2. Navigate to the project folder.
-3. Simply double-click on `index.html` to open it in any modern web browser (such as Chrome, Edge, or Safari). No installation or local server is required!
+3. Simply double-click on `index.html` to open it in any modern web browser (such as Chrome, Edge, or Safari). No installation or local server is required! *(Note: Ensure `style.css` and `script.js` remain in the same folder as `index.html` for the page to display and function correctly.)*
