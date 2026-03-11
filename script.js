@@ -31,6 +31,8 @@ generateBtn.addEventListener('click', () => {
 
     // UI Reset
     gridTitle.textContent = `${size} x ${size} Square:`;
+    const numWords = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    document.getElementById('obs-count-text').textContent = numWords[maxObstacles];
     workspace.style.display = 'block';
     resultsDiv.style.display = 'none';
     gridContainer.innerHTML = '';
