@@ -1,47 +1,44 @@
 # 0304DRL_HW1 - Grid Map Development & Policy Evaluation
 
-**[Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
-
 ![Grid Map Demo](demo.webp)
 
-This project is an implementation of a Grid Map reinforcement learning environment. It can be run as a fully static front-end web application (HTML/CSS/JS) or served locally using an included Python Flask backend.
+This project is an implementation of a Grid Map reinforcement learning environment. It consists of a frontend (HTML/CSS/JS) to handle dynamic UI rendering, and a Python Flask backend to execute synchronous/asynchronous logic for Value Iteration and Policy Evaluation over AJAX.
 
-## Features
-* **Grid Map Generation**: Allows users to specify dimensions (between 5x5 to 9x9) to generate a dynamic grid map.
-* **Environment Setup**: Users can interactively set up the Start state (Green), End state (Red), and Obstacles (Grey) by clicking on the grid cells.
-* **Policy Evaluation**: Performs policy evaluation using a uniform random stochastic policy. It visualizes:
-  * **Value Matrix**: The state value $V(s)$ distribution for the grid.
-  * **Policy Matrix**: A display of the random deterministic directional arrows.
+## Project Stages
+* **HW1-1: Grid Map Generation**: 
+  * Allows users to dynamically generate an N x N grid map (N=5 to 9). 
+  * Interactive UI allows for setting a green start state (STEP 1), a red end state (STEP 2), and $N-2$ grey obstacles (STEP 3).
+* **HW1-2: Policy Evaluation (PE)**: 
+  * Calculates the state value matrix $V(s)$ by acting completely dynamically with a uniformly random probability (25% for U/D/L/R). Uses a discount factor and penalizing step-rewards.
+* **HW1-3: Value Iteration & Optimization (VI)**: 
+  * Evaluates the policy to find the most optimal path using the **Max** operator to choose actions mathematically guaranteeing the highest expected return. 
+  * Then extracts the single best action (**Argmax**) and displays those navigation arrows dynamically rendered as SVG objects alongside an optimal path trace in Gold.
+  * Allows the user to experiment with the Risk and Reward parameters smoothly via UI Sliders.
 
-## Setup and Execution
+---
 
-Since this is a fully client-side application without any backend dependencies, running it is incredibly simple:
+## Setup and Execution (Important!)
 
-### Option 1: Live Demo (Recommended)
-You can directly interact with the application through GitHub Pages without downloading anything:
-👉 **[Click here for the Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
+Because the RL logic executes via AJAX requests connecting to a backend server, **this project CANNOT be run purely statically on GitHub Pages. You must run it locally using Python.**
 
-### Option 2: Run Locally (Static HTML)
-1. Clone this repository to your local machine:
-   ```bash
-   git clone https://github.com/enwu03/0304DRL_HW1.git
-   ```
-2. Navigate to the project folder.
-3. Simply double-click on `index.html` to open it in any modern web browser (such as Chrome, Edge, or Safari). No installation or local server is required! *(Note: Ensure `style.css` and `script.js` remain in the same folder as `index.html` for the page to display and function correctly.)*
-
-### Option 3: Run Locally (Flask Backend)
-For developers who want to run or interact with the Python backend evaluation logic:
-1. Ensure you have Python installed, then install Flask:
+1. Ensure you have Python installed, then install the required `Flask` dependency:
    ```bash
    pip install flask
    ```
+
 2. Clone the repository and navigate into the folder:
    ```bash
    git clone https://github.com/enwu03/0304DRL_HW1.git
    cd 0304DRL_HW1
    ```
-3. Run the application:
+
+3. Run the backend server application:
    ```bash
    python app.py
    ```
-4. Open a web browser and navigate to `http://127.0.0.1:5000`
+   *(You should see an output saying it is running on `http://127.0.0.1:5000`)*
+
+4. Open any modern web browser and navigate directly to:
+   **[http://127.0.0.1:5000](http://127.0.0.1:5000)**
+
+5. Try interacting with the map, generating a layout, adjusting the Discount/Reward sliders, and clicking the calculation buttons to observe AJAX updates from the server!
