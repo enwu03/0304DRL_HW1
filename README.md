@@ -2,7 +2,7 @@
 
 **[Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
 
-This project is an implementation of a Grid Map reinforcement learning environment using Python (Flask) and HTML/JS. 
+This project is an implementation of a Grid Map reinforcement learning environment built entirely with **Pure HTML, CSS, and vanilla JavaScript**. It does not require any backend server to run.
 
 ## Features
 * **Grid Map Generation**: Allows users to specify dimensions (between 5x5 to 9x9) to generate a dynamic grid map.
@@ -12,6 +12,17 @@ This project is an implementation of a Grid Map reinforcement learning environme
   * **Policy Matrix**: A display of the random deterministic directional arrows.
 
 ## Setup and Execution
-1. Simply download or clone the repository to your computer.
-2. Open `index.html` in your web browser (Chrome, Edge, Safari, etc.). There is no server required.
-3. If deployed on GitHub Pages, visit the URL to interact directly in the browser!
+
+Since this is a fully client-side application without any backend dependencies, running it is incredibly simple:
+
+### Option 1: Live Demo (Recommended)
+You can directly interact with the application through GitHub Pages without downloading anything:
+👉 **[Click here for the Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
+
+### Option 2: Run Locally
+1. Clone this repository to your local machine:
+   ```bash
+   git clone https://github.com/enwu03/0304DRL_HW1.git
+   ```
+2. Navigate to the project folder.
+3. Simply double-click on `index.html` to open it in any modern web browser (such as Chrome, Edge, or Safari). No installation or local server is required!
