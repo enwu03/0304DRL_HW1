@@ -2,6 +2,8 @@
 
 **[Live Demo](https://enwu03.github.io/0304DRL_HW1/)**
 
+![Grid Map Demo](demo.webp)
+
 This project is an implementation of a Grid Map reinforcement learning environment built entirely with **Pure HTML, CSS, and vanilla JavaScript**. It does not require any backend server to run.
 
 ## Features
