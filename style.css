@@ -1,42 +1,50 @@
 body {
-    font-family: "Times New Roman", Times, serif; 
+    font-family: "Times New Roman", Times, serif;
     margin: 20px;
     font-size: 16px;
 }
+
 .controls {
     display: flex;
     align-items: center;
     gap: 10px;
     margin-bottom: 20px;
 }
+
 .controls label {
     font-size: 1.1em;
 }
+
 .controls input {
     width: 50px;
     padding: 3px;
     font-size: 1em;
 }
+
 .controls button {
     padding: 4px 10px;
     font-size: 1em;
     cursor: pointer;
 }
+
 h2 {
     margin: 10px 0;
     font-size: 1.3em;
 }
+
 .instruction {
     margin-left: 20px;
     font-size: 1.1em;
     margin-bottom: 15px;
 }
+
 .grid-container {
     margin-left: 20px;
     display: inline-grid;
     border-top: 1px solid black;
     border-left: 1px solid black;
 }
+
 .cell {
     width: 45px;
     height: 45px;
@@ -49,13 +57,26 @@ h2 {
     user-select: none;
     font-size: 1.1em;
 }
+
 /* Color states */
 .cell.start {
     background-color: green;
 }
+
 .cell.end {
     background-color: red;
 }
+
 .cell.obstacle {
     background-color: grey;
+}
+
+.cell.path {
+    background-color: #ffd700;
+}
+
+.cell svg {
+    width: 60%;
+    height: 60%;
+    pointer-events: none;
 }

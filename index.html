@@ -29,7 +29,22 @@
         <div id="grid" class="grid-container"></div>
 
         <div class="instruction" style="margin-top: 20px;">
-            2. After setup, click: <button id="eval-btn">Run Policy Evaluation</button>
+            <p><strong>Parameter Tuning:</strong></p>
+            <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 15px;">
+                <div>
+                    <label>Discount Factor (&gamma;): <span id="gamma-val">0.9</span></label><br>
+                    <input type="range" id="gamma-slider" min="0" max="1" step="0.1" value="0.9">
+                </div>
+                <div>
+                    <label>Step Reward (Risk penalty): <span id="reward-val">-1</span></label><br>
+                    <input type="range" id="reward-slider" min="-10" max="0" step="1" value="-1">
+                </div>
+            </div>
+            <p>2. Choose an algorithm to run:</p>
+            <div style="display: flex; gap: 10px;">
+                <button id="eval-btn-pe">HW1-2: Policy Evaluation (Random Average)</button>
+                <button id="eval-btn-vi">HW1-3: Value Iteration & Optimal Path</button>
+            </div>
         </div>
 
         <div id="results" style="display: none; flex-wrap: wrap; gap: 40px; margin-top: 40px; padding-bottom: 50px;">
