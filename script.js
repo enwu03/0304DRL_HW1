@@ -1,0 +1,233 @@
+// --- UI State ---
+let currentSize = 0;
+let maxObstacles = 0;
+let startCell = null;
+let endCell = null;
+let obstacles = [];
+
+// DOM Elements
+const generateBtn = document.getElementById('generate-btn');
+const sizeInput = document.getElementById('grid-size');
+const workspace = document.getElementById('workspace');
+const gridContainer = document.getElementById('grid');
+const gridTitle = document.getElementById('grid-title');
+const evalBtn = document.getElementById('eval-btn');
+const resultsDiv = document.getElementById('results');
+
+// --- Event Listeners ---
+generateBtn.addEventListener('click', () => {
+    const size = parseInt(sizeInput.value);
+    if (isNaN(size) || size < 5 || size > 9) {
+        alert("Please enter a valid number between 5 and 9.");
+        return;
+    }
+
+    // Init state
+    currentSize = size;
+    maxObstacles = size - 2;
+    startCell = null;
+    endCell = null;
+    obstacles = [];
+
+    // UI Reset
+    gridTitle.textContent = `${size} x ${size} Square:`;
+    workspace.style.display = 'block';
+    resultsDiv.style.display = 'none';
+    gridContainer.innerHTML = '';
+    gridContainer.style.gridTemplateColumns = `repeat(${size}, 45px)`;
+
+    let cellNum = 1;
+    for (let i = 0; i < size * size; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'cell';
+        cell.textContent = cellNum++;
+        cell.addEventListener('click', () => handleCellClick(cell));
+        gridContainer.appendChild(cell);
+    }
+});
+
+evalBtn.addEventListener('click', () => {
+    if (!startCell || !endCell) {
+        alert("Please set both a start (green) and an end (red) cell.");
+        return;
+    }
+
+    const startPos = getCellPos(startCell);
+    const endPos = getCellPos(endCell);
+    const obsPos = obstacles.map(getCellPos);
+
+    evalBtn.disabled = true;
+    evalBtn.textContent = 'Evaluating...';
+
+    // Give UI a moment to show "Evaluating..."
+    setTimeout(() => {
+        const results = evaluatePolicy(currentSize, startPos, endPos, obsPos);
+        displayResults(results.policy, results.values, startPos, endPos, obsPos);
+        evalBtn.disabled = false;
+        evalBtn.textContent = 'Run Policy Evaluation';
+    }, 50);
+});
+
+// --- Helper Functions ---
+function handleCellClick(cell) {
+    if (cell === startCell) {
+        cell.classList.remove('start');
+        startCell = null;
+        return;
+    }
+    if (cell === endCell) {
+        cell.classList.remove('end');
+        endCell = null;
+        return;
+    }
+    if (obstacles.includes(cell)) {
+        cell.classList.remove('obstacle');
+        obstacles = obstacles.filter(c => c !== cell);
+        return;
+    }
+
+    if (!startCell) {
+        cell.classList.add('start');
+        startCell = cell;
+    } else if (!endCell) {
+        cell.classList.add('end');
+        endCell = cell;
+    } else if (obstacles.length < maxObstacles) {
+        cell.classList.add('obstacle');
+        obstacles.push(cell);
+    } else {
+        alert(`You can only set up to ${maxObstacles} obstacles for a ${currentSize} x ${currentSize} grid.`);
+    }
+}
+
+function getCellPos(cell) {
+    const index = parseInt(cell.textContent) - 1;
+    const r = Math.floor(index / currentSize);
+    const c = index % currentSize;
+    return [r, c];
+}
+
+// --- Reinforcement Learning Logic ---
+function evaluatePolicy(size, start, end, obstacles) {
+    const actions = ['U', 'D', 'L', 'R'];
+    const policy = {};
+    const V = {};
+    const gamma = 0.9;
+    const theta = 1e-4;
+
+    const isObstacle = (r, c) => obstacles.some(obs => obs[0] === r && obs[1] === c);
+    const isEnd = (r, c) => end[0] === r && end[1] === c;
+
+    // 1. Generate random deterministic policy & init V
+    for (let r = 0; r < size; r++) {
+        for (let c = 0; c < size; c++) {
+            const key = `${r},${c}`;
+            V[key] = 0.0;
+            if (isEnd(r, c) || isObstacle(r, c)) continue;
+            policy[key] = actions[Math.floor(Math.random() * actions.length)];
+        }
+    }
+
+    // 2. Policy Evaluation (Evaluating a uniform random policy)
+    let max_iters = 1000;
+    for (let iter = 0; iter < max_iters; iter++) {
+        let delta = 0.0;
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                if (isEnd(r, c) || isObstacle(r, c)) continue;
+
+                const state_key = `${r},${c}`;
+                let v = V[state_key];
+
+                let new_v = 0.0;
+                for (let a of actions) {
+                    let nr = r, nc = c;
+                    if (a === 'U') nr -= 1;
+                    else if (a === 'D') nr += 1;
+                    else if (a === 'L') nc -= 1;
+                    else if (a === 'R') nc += 1;
+
+                    if (nr < 0 || nr >= size || nc < 0 || nc >= size || isObstacle(nr, nc)) {
+                        nr = r;
+                        nc = c;
+                    }
+
+                    let next_state_key = `${nr},${nc}`;
+                    let reward = isEnd(nr, nc) ? 10.0 : -1.0;
+                    // Uniform probability
+                    new_v += 0.25 * (reward + gamma * V[next_state_key]);
+                }
+
+                V[state_key] = new_v;
+                delta = Math.max(delta, Math.abs(v - new_v));
+            }
+        }
+        if (delta < theta) break;
+    }
+
+    const formatted_V = {};
+    for (const [k, v] of Object.entries(V)) {
+        formatted_V[k] = parseFloat(v).toFixed(2);
+    }
+
+    return { policy: policy, values: formatted_V };
+}
+
+// --- Render Results ---
+function displayResults(policy, values, startPos, endPos, obsPos) {
+    resultsDiv.style.display = 'flex';
+    const vGrid = document.getElementById('value-grid');
+    const pGrid = document.getElementById('policy-grid');
+
+    vGrid.style.gridTemplateColumns = `repeat(${currentSize}, 55px)`;
+    pGrid.style.gridTemplateColumns = `repeat(${currentSize}, 55px)`;
+
+    vGrid.innerHTML = '';
+    pGrid.innerHTML = '';
+
+    const arrows = { 'U': '↑', 'D': '↓', 'L': '←', 'R': '→' };
+    const isPosInArray = (pos, arr) => arr.some(p => p[0] === pos[0] && p[1] === pos[1]);
+    const isPosEqual = (p1, p2) => p1[0] === p2[0] && p1[1] === p2[1];
+
+    for (let r = 0; r < currentSize; r++) {
+        for (let c = 0; c < currentSize; c++) {
+            const key = `${r},${c}`;
+            const pos = [r, c];
+
+            const vc = document.createElement('div');
+            vc.className = 'cell';
+            vc.style.fontSize = '0.9em';
+            vc.style.width = '55px';
+            vc.style.height = '55px';
+
+            const pc = document.createElement('div');
+            pc.className = 'cell';
+            pc.style.fontSize = '1.3em';
+            pc.style.width = '55px';
+            pc.style.height = '55px';
+
+            if (isPosEqual(pos, startPos)) {
+                vc.classList.add('start');
+                pc.classList.add('start');
+                vc.textContent = values[key];
+                pc.textContent = arrows[policy[key]] || '';
+            } else if (isPosEqual(pos, endPos)) {
+                vc.classList.add('end');
+                pc.classList.add('end');
+                vc.textContent = '0'; // Terminal state
+                pc.textContent = 'G'; // Goal
+            } else if (isPosInArray(pos, obsPos)) {
+                vc.classList.add('obstacle');
+                pc.classList.add('obstacle');
+                vc.textContent = '';
+                pc.textContent = '';
+            } else {
+                vc.textContent = values[key];
+                pc.textContent = arrows[policy[key]];
+            }
+
+            vGrid.appendChild(vc);
+            pGrid.appendChild(pc);
+        }
+    }
+}
